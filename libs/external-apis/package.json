@@ -1,0 +1,31 @@
+{
+  "name": "@s16z/external-apis",
+  "version": "1.0.0",
+  "description": "External API clients with NestJS integration for S16Z PMS",
+  "type": "commonjs",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "node-fetch": "^3.3.2",
+    "ioredis": "^5.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "api-client",
+    "hrp",
+    "1token",
+    "external-apis",
+    "nestjs",
+    "s16z"
+  ],
+  "author": "",
+  "license": "ISC"
+}

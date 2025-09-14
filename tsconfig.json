@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2020",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "forceConsistentCasingInFileNames": false,
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@s16z/common": ["libs/common/src"],
+      "@s16z/common/*": ["libs/common/src/*"],
+      "@s16z/database": ["libs/database/src"],
+      "@s16z/database/*": ["libs/database/src/*"],
+      "@s16z/external-apis": ["libs/external-apis/src"],
+      "@s16z/external-apis/*": ["libs/external-apis/src/*"],
+      "@s16z/business-logic": ["libs/business-logic/src"],
+      "@s16z/business-logic/*": ["libs/business-logic/src/*"],
+      "@s16z/api-types": ["libs/api-types/src"],
+      "@s16z/api-types/*": ["libs/api-types/src/*"],
+      "@s16z/ui-components": ["libs/ui-components/src"],
+      "@s16z/ui-components/*": ["libs/ui-components/src/*"],
+      "@s16z/frontend-utils": ["libs/frontend-utils/src"],
+      "@s16z/frontend-utils/*": ["libs/frontend-utils/src/*"]
+    }
+  }
+}
