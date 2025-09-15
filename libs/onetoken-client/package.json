@@ -1,0 +1,37 @@
+{
+  "name": "@s16z/onetoken-client",
+  "version": "1.0.0",
+  "description": "1Token API client for S16Z PMS",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/cache-manager": "^2.0.0",
+    "cache-manager": "^5.0.0",
+    "openapi-fetch": "^0.8.0",
+    "socks-proxy-agent": "^8.0.0",
+    "node-fetch": "^3.3.0",
+    "crypto": "^1.0.1"
+  },
+  "peerDependencies": {
+    "@nestjs/core": "^10.0.0",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "1token",
+    "onetoken",
+    "api-client",
+    "nestjs",
+    "typescript"
+  ],
+  "author": "S16Z",
+  "license": "MIT"
+}

@@ -20,8 +20,12 @@
     "paths": {
       "@app/database": ["libs/database/src"],
       "@app/database/*": ["libs/database/src/*"],
-      "@app/external-apis": ["libs/external-apis/src"],
-      "@app/external-apis/*": ["libs/external-apis/src/*"],
+      "@s16z/api-client-base": ["libs/api-client-base/src"],
+      "@s16z/api-client-base/*": ["libs/api-client-base/src/*"],
+      "@s16z/hrp-client": ["libs/hrp-client/src"],
+      "@s16z/hrp-client/*": ["libs/hrp-client/src/*"],
+      "@s16z/onetoken-client": ["libs/onetoken-client/src"],
+      "@s16z/onetoken-client/*": ["libs/onetoken-client/src/*"],
       "@app/common": ["libs/common/src"],
       "@app/common/*": ["libs/common/src/*"]
     }

@@ -28,13 +28,31 @@
         "tsConfigPath": "libs/database/tsconfig.lib.json"
       }
     },
-    "external-apis": {
+    "api-client-base": {
       "type": "library",
-      "root": "libs/external-apis",
+      "root": "libs/api-client-base",
       "entryFile": "index",
-      "sourceRoot": "libs/external-apis/src",
+      "sourceRoot": "libs/api-client-base/src",
       "compilerOptions": {
-        "tsConfigPath": "libs/external-apis/tsconfig.lib.json"
+        "tsConfigPath": "libs/api-client-base/tsconfig.lib.json"
+      }
+    },
+    "hrp-client": {
+      "type": "library",
+      "root": "libs/hrp-client",
+      "entryFile": "index",
+      "sourceRoot": "libs/hrp-client/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/hrp-client/tsconfig.lib.json"
+      }
+    },
+    "onetoken-client": {
+      "type": "library",
+      "root": "libs/onetoken-client",
+      "entryFile": "index",
+      "sourceRoot": "libs/onetoken-client/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/onetoken-client/tsconfig.lib.json"
       }
     },
     "common": {

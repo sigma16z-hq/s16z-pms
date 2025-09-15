@@ -237,13 +237,37 @@ This plan provides a structured approach to migrate the entire system while main
     - [x] Add specialized query methods (findWithValuations, findNetInflowForAccount, etc.)
     - [x] Test build and ensure all repositories are properly registered
 
+- [x] Phase 3: External APIs Integration
+  - [x] Create external-apis library structure in libs/external-apis/
+  - [x] Copy and adapt OpenAPI schemas from old project (1Token and HRP)
+  - [x] Create base cached client class with NestJS cache manager integration
+  - [x] 1Token Client Migration:
+    - [x] Migrate OneTokenService with HMAC signature authentication
+    - [x] Preserve all API methods (listPortfolios, getPortfolioHistoricalNav, getCryptocurrencies, etc.)
+    - [x] Implement SOCKS5 proxy support
+    - [x] Create OneTokenModule with forRoot/forRootAsync configuration
+    - [x] Replace direct Redis usage with NestJS cache manager
+  - [x] HRP Client Migration:
+    - [x] Create HRPAuthService for OAuth2 client credentials flow
+    - [x] Implement token management with automatic refresh (5-minute buffer)
+    - [x] Create HRPService with pagination support for large datasets
+    - [x] Migrate all API methods (trades, deposits, withdrawals, CIP calculations)
+    - [x] Create HRPModule with proper dependency injection
+    - [x] Preserve SOCKS5 proxy support
+  - [x] External APIs Module:
+    - [x] Create consolidated ExternalApisModule with forRoot/forRootAsync
+    - [x] Set up proper module imports and configuration
+    - [x] Install and configure @nestjs/config dependency
+    - [x] Update main AppModule to use ConfigModule and ExternalApisModule
+    - [x] Test build and application startup successfully
+    - [x] Verify all modules load correctly without errors
+
 ### In Progress:
 
-- [ ] Phase 3: External APIs Integration
+- [ ] Phase 4: Business Logic Services
 
 ### Next Steps:
 
-1. Start databases with `pnpm docker:up`
-2. Test database connection with actual PostgreSQL instance
-3. Begin migrating 1Token API client from old project
-4. Begin migrating HRP API client from old project
+1. Begin migrating PortfolioCalcService and related calculation services
+2. Migrate fee services (PortfolioFeeService, CipFeeService, etc.)
+3. Set up transfer and quote services migration

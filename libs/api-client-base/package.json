@@ -1,0 +1,33 @@
+{
+  "name": "@s16z/api-client-base",
+  "version": "1.0.0",
+  "description": "Base utilities for API clients in S16Z PMS",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/cache-manager": "^2.0.0",
+    "cache-manager": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@nestjs/core": "^10.0.0",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "api-client",
+    "base",
+    "utilities",
+    "nestjs",
+    "typescript"
+  ],
+  "author": "S16Z",
+  "license": "MIT"
+}
