@@ -1,1 +1,2 @@
-// Database module - will be implemented in Phase 2
+export * from './database.module';
+export * from './database.service';
