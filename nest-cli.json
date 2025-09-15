@@ -19,33 +19,6 @@
         "tsConfigPath": "apps/pms-api/tsconfig.app.json"
       }
     },
-    "pms-data-fetch": {
-      "type": "application",
-      "root": "apps/pms-data-fetch",
-      "entryFile": "main",
-      "sourceRoot": "apps/pms-data-fetch/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/pms-data-fetch/tsconfig.app.json"
-      }
-    },
-    "pms-admin-api": {
-      "type": "application",
-      "root": "apps/pms-admin-api",
-      "entryFile": "main",
-      "sourceRoot": "apps/pms-admin-api/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/pms-admin-api/tsconfig.app.json"
-      }
-    },
-    "common": {
-      "type": "library",
-      "root": "libs/common",
-      "entryFile": "index",
-      "sourceRoot": "libs/common/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/common/tsconfig.lib.json"
-      }
-    },
     "database": {
       "type": "library",
       "root": "libs/database",
@@ -64,22 +37,13 @@
         "tsConfigPath": "libs/external-apis/tsconfig.lib.json"
       }
     },
-    "business-logic": {
+    "common": {
       "type": "library",
-      "root": "libs/business-logic",
+      "root": "libs/common",
       "entryFile": "index",
-      "sourceRoot": "libs/business-logic/src",
+      "sourceRoot": "libs/common/src",
       "compilerOptions": {
-        "tsConfigPath": "libs/business-logic/tsconfig.lib.json"
-      }
-    },
-    "api-types": {
-      "type": "library",
-      "root": "libs/api-types",
-      "entryFile": "index",
-      "sourceRoot": "libs/api-types/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/api-types/tsconfig.lib.json"
+        "tsConfigPath": "libs/common/tsconfig.lib.json"
       }
     }
   }

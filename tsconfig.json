@@ -6,7 +6,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "target": "ES2020",
+    "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
@@ -18,20 +18,12 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@s16z/common": ["libs/common/src"],
-      "@s16z/common/*": ["libs/common/src/*"],
-      "@s16z/database": ["libs/database/src"],
-      "@s16z/database/*": ["libs/database/src/*"],
-      "@s16z/external-apis": ["libs/external-apis/src"],
-      "@s16z/external-apis/*": ["libs/external-apis/src/*"],
-      "@s16z/business-logic": ["libs/business-logic/src"],
-      "@s16z/business-logic/*": ["libs/business-logic/src/*"],
-      "@s16z/api-types": ["libs/api-types/src"],
-      "@s16z/api-types/*": ["libs/api-types/src/*"],
-      "@s16z/ui-components": ["libs/ui-components/src"],
-      "@s16z/ui-components/*": ["libs/ui-components/src/*"],
-      "@s16z/frontend-utils": ["libs/frontend-utils/src"],
-      "@s16z/frontend-utils/*": ["libs/frontend-utils/src/*"]
+      "@app/database": ["libs/database/src"],
+      "@app/database/*": ["libs/database/src/*"],
+      "@app/external-apis": ["libs/external-apis/src"],
+      "@app/external-apis/*": ["libs/external-apis/src/*"],
+      "@app/common": ["libs/common/src"],
+      "@app/common/*": ["libs/common/src/*"]
     }
   }
 }

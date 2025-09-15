@@ -1,11 +1,11 @@
 {
-  "name": "@app/external-apis",
+  "name": "@app/common",
   "version": "0.0.1",
-  "description": "External API clients for 1Token and HRP",
+  "description": "Common utilities and shared code",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "nest build external-apis"
+    "build": "nest build common"
   },
   "dependencies": {},
   "devDependencies": {}
