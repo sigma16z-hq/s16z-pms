@@ -1,6 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { HRPService } from './hrp.service';
 import { HRPAuthService } from './hrp-auth.service';
+import { HRPClientFactory } from './hrp-client.factory';
 import { HRPModuleOptions } from '../types';
 
 @Module({})
@@ -13,8 +14,8 @@ export class HRPModule {
 
     return {
       module: HRPModule,
-      providers: [configProvider, HRPAuthService, HRPService],
-      exports: [HRPService, HRPAuthService],
+      providers: [configProvider, HRPAuthService, HRPService, HRPClientFactory],
+      exports: [HRPService, HRPAuthService, HRPClientFactory],
       global: false,
     };
   }
@@ -33,8 +34,8 @@ export class HRPModule {
     return {
       module: HRPModule,
       imports: options.imports || [],
-      providers: [configProvider, HRPAuthService, HRPService],
-      exports: [HRPService, HRPAuthService],
+      providers: [configProvider, HRPAuthService, HRPService, HRPClientFactory],
+      exports: [HRPService, HRPAuthService, HRPClientFactory],
       global: false,
     };
   }

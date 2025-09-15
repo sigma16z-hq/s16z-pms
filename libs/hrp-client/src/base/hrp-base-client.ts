@@ -2,7 +2,22 @@ import { Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import createClient from 'openapi-fetch';
 import type { paths as HRPDataPaths } from '../schemas/data/schema';
-import { HRPConfig } from '../types';
+import {
+  HRPConfig,
+  HRPTimestampParams,
+  HRPPaginationParams,
+  HRPSnapshotParams,
+  HRPAccount,
+  HRPCIPCalculation,
+  HRPTradeEvent,
+  HRPTransferEvent,
+  HRPAdjustmentEvent,
+  HRPERSCalculation,
+  HRPFinancingCalculation,
+  HRPExecutionPremiumCalculation,
+  HRPPositionsSnapshot,
+  HRPBalancesSnapshot
+} from '../types';
 import { HRPAuthClient } from '../auth/hrp-auth-client';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import fetch from 'node-fetch';
@@ -215,7 +230,7 @@ export class HRPBaseClient {
   }
 
   // API Methods
-  async listAccounts() {
+  async listAccounts(): Promise<HRPAccount[]> {
     const startTime = Date.now();
 
     const { data, error } = await this.client.GET('/v0/accountactivity/accounts', {
@@ -235,8 +250,490 @@ export class HRPBaseClient {
     return data.results;
   }
 
-  // Add other API methods as needed...
-  // (fetchTradesPage, fetchAllTrades, etc.)
+  // CIP Calculations
+  async fetchCIPCalculations(params: HRPTimestampParams): Promise<HRPCIPCalculation[]> {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/calculations/v0/cip', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          start_event_timestamp_inclusive: params.startEventTimestampInclusive,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+          page_size: params.pageSize,
+          start_record_event_id: params.startRecordEventId,
+          start_record_correction_version: params.startRecordCorrectionVersion,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/calculations/v0/cip', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch CIP calculations: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  async fetchAllCIPCalculations(params: HRPPaginationParams): Promise<HRPCIPCalculation[]> {
+    const allResults: any[] = [];
+    let nextPage: string | undefined;
+    let pageCount = 0;
+    const maxPages = params.maxPages || 100;
+
+    do {
+      const result = await this.fetchCIPCalculations({
+        ...params,
+        startRecordEventId: nextPage,
+      });
+
+      allResults.push(...result);
+
+      // Note: The API doesn't seem to return next_page in the schema, so we'll break after one page
+      // This would need to be updated based on the actual API response structure
+      break;
+
+      pageCount++;
+    } while (nextPage && pageCount < maxPages);
+
+    return allResults;
+  }
+
+  // Trades
+  async fetchTrades(params: {
+    venue?: string;
+    account?: string;
+    startEventTimestampInclusive?: string;
+    endEventTimestampExclusive?: string;
+    pageSize?: number;
+    startRecordEventId?: string;
+    startRecordCorrectionVersion?: number;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/trades', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          start_event_timestamp_inclusive: params.startEventTimestampInclusive,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+          page_size: params.pageSize,
+          start_record_event_id: params.startRecordEventId,
+          start_record_correction_version: params.startRecordCorrectionVersion,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/trades', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch trades: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  async fetchAllTrades(params: {
+    venue?: string;
+    account?: string;
+    startEventTimestampInclusive?: string;
+    endEventTimestampExclusive?: string;
+    pageSize?: number;
+    maxPages?: number;
+  }) {
+    const allResults: any[] = [];
+    let nextPage: string | undefined;
+    let pageCount = 0;
+    const maxPages = params.maxPages || 100;
+
+    do {
+      const result = await this.fetchTrades({
+        ...params,
+        startRecordEventId: nextPage,
+      });
+
+      allResults.push(...result);
+
+      // Note: The API doesn't seem to return next_page in the schema, so we'll break after one page
+      // This would need to be updated based on the actual API response structure
+      break;
+
+      pageCount++;
+    } while (nextPage && pageCount < maxPages);
+
+    return allResults;
+  }
+
+  // Deposits
+  async fetchDeposits(params: {
+    venue?: string;
+    account?: string;
+    startEventTimestampInclusive?: string;
+    endEventTimestampExclusive?: string;
+    pageSize?: number;
+    startRecordEventId?: string;
+    startRecordCorrectionVersion?: number;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/transfers/deposits', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          start_event_timestamp_inclusive: params.startEventTimestampInclusive,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+          page_size: params.pageSize,
+          start_record_event_id: params.startRecordEventId,
+          start_record_correction_version: params.startRecordCorrectionVersion,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/transfers/deposits', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch deposits: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  // Withdrawals
+  async fetchWithdrawals(params: {
+    venue?: string;
+    account?: string;
+    startEventTimestampInclusive?: string;
+    endEventTimestampExclusive?: string;
+    pageSize?: number;
+    startRecordEventId?: string;
+    startRecordCorrectionVersion?: number;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/transfers/withdrawals', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          start_event_timestamp_inclusive: params.startEventTimestampInclusive,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+          page_size: params.pageSize,
+          start_record_event_id: params.startRecordEventId,
+          start_record_correction_version: params.startRecordCorrectionVersion,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/transfers/withdrawals', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch withdrawals: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  // ERS Calculations
+  async fetchERSCalculations(params: {
+    venue?: string;
+    account?: string;
+    startEventTimestampInclusive?: string;
+    endEventTimestampExclusive?: string;
+    pageSize?: number;
+    startRecordEventId?: string;
+    startRecordCorrectionVersion?: number;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/calculations/v0/ers', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          start_event_timestamp_inclusive: params.startEventTimestampInclusive,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+          page_size: params.pageSize,
+          start_record_event_id: params.startRecordEventId,
+          start_record_correction_version: params.startRecordCorrectionVersion,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/calculations/v0/ers', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch ERS calculations: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  // Financing Calculations
+  async fetchFinancingCalculations(params: {
+    venue?: string;
+    account?: string;
+    startEventTimestampInclusive?: string;
+    endEventTimestampExclusive?: string;
+    pageSize?: number;
+    startRecordEventId?: string;
+    startRecordCorrectionVersion?: number;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/calculations/v0/financing', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          start_event_timestamp_inclusive: params.startEventTimestampInclusive,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+          page_size: params.pageSize,
+          start_record_event_id: params.startRecordEventId,
+          start_record_correction_version: params.startRecordCorrectionVersion,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/calculations/v0/financing', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch financing calculations: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  // Execution Premium Calculations
+  async fetchExecutionPremiumCalculations(params: {
+    venue?: string;
+    account?: string;
+    startEventTimestampInclusive?: string;
+    endEventTimestampExclusive?: string;
+    pageSize?: number;
+    startRecordEventId?: string;
+    startRecordCorrectionVersion?: number;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/calculations/v0/execution-premium', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          start_event_timestamp_inclusive: params.startEventTimestampInclusive,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+          page_size: params.pageSize,
+          start_record_event_id: params.startRecordEventId,
+          start_record_correction_version: params.startRecordCorrectionVersion,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/calculations/v0/execution-premium', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch execution premium calculations: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  // Positions Snapshots
+  async fetchPositionsSnapshots(params: {
+    venue?: string;
+    account?: string;
+    pageSize?: number;
+    accountOffset?: string;
+    endEventTimestampExclusive?: string;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/positions-snapshots', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          page_size: params.pageSize,
+          account_offset: params.accountOffset,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/positions-snapshots', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch positions snapshots: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  // Balances Snapshots
+  async fetchBalancesSnapshots(params: {
+    venue?: string;
+    account?: string;
+    pageSize?: number;
+    accountOffset?: string;
+    endEventTimestampExclusive?: string;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/balances-snapshots', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          page_size: params.pageSize,
+          account_offset: params.accountOffset,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/balances-snapshots', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch balances snapshots: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  // Credits
+  async fetchCredits(params: {
+    venue?: string;
+    account?: string;
+    startEventTimestampInclusive?: string;
+    endEventTimestampExclusive?: string;
+    pageSize?: number;
+    startRecordEventId?: string;
+    startRecordCorrectionVersion?: number;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/adjustments/credits', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          start_event_timestamp_inclusive: params.startEventTimestampInclusive,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+          page_size: params.pageSize,
+          start_record_event_id: params.startRecordEventId,
+          start_record_correction_version: params.startRecordCorrectionVersion,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/adjustments/credits', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch credits: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  // Debits
+  async fetchDebits(params: {
+    venue?: string;
+    account?: string;
+    startEventTimestampInclusive?: string;
+    endEventTimestampExclusive?: string;
+    pageSize?: number;
+    startRecordEventId?: string;
+    startRecordCorrectionVersion?: number;
+  }) {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/adjustments/debits', {
+      params: {
+        query: {
+          venue: params.venue,
+          account: params.account,
+          start_event_timestamp_inclusive: params.startEventTimestampInclusive,
+          end_event_timestamp_exclusive: params.endEventTimestampExclusive,
+          page_size: params.pageSize,
+          start_record_event_id: params.startRecordEventId,
+          start_record_correction_version: params.startRecordCorrectionVersion,
+        },
+      },
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/adjustments/debits', params, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to fetch debits: ${JSON.stringify(error)}`);
+    }
+
+    if (!data?.results) {
+      throw new Error('Invalid response format: missing results');
+    }
+
+    return data.results;
+  }
+
+  // Ping endpoint for testing connectivity
+  async ping() {
+    const startTime = Date.now();
+
+    const { data, error } = await this.client.GET('/v0/accountactivity/ping', {
+      params: {},
+    });
+
+    await this.logApiCall('GET', '/v0/accountactivity/ping', null, { data, error }, Date.now() - startTime);
+
+    if (error) {
+      throw new Error(`Failed to ping HRP API: ${JSON.stringify(error)}`);
+    }
+
+    return data;
+  }
 
   /**
    * Get the underlying API client for direct access

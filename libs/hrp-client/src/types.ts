@@ -41,3 +41,40 @@ export type HRPFinancingCalculation = DataComponentsType['schemas']['FinancingCa
 export type HRPExecutionPremiumCalculation = DataComponentsType['schemas']['ExecutionPremiumCalculation'];
 export type HRPTransferEvent = DataComponentsType['schemas']['TransferEvent'];
 export type HRPAdjustmentEvent = DataComponentsType['schemas']['AdjustmentEvent'];
+export type HRPPositionsSnapshot = DataComponentsType['schemas']['PositionsSnapshot'];
+export type HRPBalancesSnapshot = DataComponentsType['schemas']['BalancesSnapshot'];
+
+// API Parameter interfaces
+export interface HRPTimestampParams {
+  venue?: string;
+  account?: string;
+  startEventTimestampInclusive?: string;
+  endEventTimestampExclusive?: string;
+  pageSize?: number;
+  startRecordEventId?: string;
+  startRecordCorrectionVersion?: number;
+}
+
+export interface HRPPaginationParams {
+  venue?: string;
+  account?: string;
+  startEventTimestampInclusive?: string;
+  endEventTimestampExclusive?: string;
+  pageSize?: number;
+  maxPages?: number;
+}
+
+export interface HRPSnapshotParams {
+  venue?: string;
+  account?: string;
+  pageSize?: number;
+  accountOffset?: string;
+  endEventTimestampExclusive?: string;
+}
+
+export interface ShareClassHRPCredentials {
+  shareClassName: string;
+  clientId: string;
+  clientSecret: string;
+  audience?: string;
+}
