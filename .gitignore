@@ -1,6 +1,5 @@
 .idea
 *.local.*
-.claude
 
 # Logs
 logs
