@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '@app/database';
-import { ShareClass, HrpTradingAccountType, Prisma } from '@prisma/client';
+import { Injectable, Logger } from '@nestjs/common';
+import { HrpTradingAccountType, Prisma, ShareClass } from '@prisma/client';
 import { HRPClientFactory } from '@s16z/hrp-client';
 import { HRPAccount } from '../types/hrp.types';
 
@@ -86,12 +86,15 @@ export class HRPAccountProcessorService {
 
     for (const shareClass of shareClasses) {
       try {
-        // Process each ShareClass within its own transaction
+        // Process each ShareClass within its own transaction with increased timeout
         const accounts = await this.databaseService.$transaction(async (tx) => {
           this.logger.log(`Starting transaction for ShareClass: ${shareClass.name}`);
           const processedAccounts = await this.processAccountsForShareClass(shareClass, tx);
           this.logger.log(`Transaction completed successfully for ShareClass: ${shareClass.name}`);
           return processedAccounts;
+        }, {
+          maxWait: 10000, // Maximum time to wait for a transaction slot (10s)
+          timeout: 60000, // Transaction timeout (60s) - increased from default 5s
         });
 
         results.set(shareClass.name, accounts);

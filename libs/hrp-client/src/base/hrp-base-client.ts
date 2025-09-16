@@ -46,7 +46,7 @@ export class HRPBaseClient {
     this.logger = new Logger(clientName);
 
     // Create auth client
-    this.authClient = new HRPAuthClient(config);
+    this.authClient = new HRPAuthClient(config, `${clientName}Auth`);
 
     // Create fetch with proxy if needed
     this.customFetch = this.createFetchWithProxy();
