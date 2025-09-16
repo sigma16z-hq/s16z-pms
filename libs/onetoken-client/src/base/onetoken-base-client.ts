@@ -18,6 +18,8 @@ export class OneTokenBaseClient {
   protected readonly cacheManager?: Cache;
   protected readonly clientName: string;
 
+  private useMiddleware = false;
+
   constructor(
     config: OneTokenConfig,
     cacheManager?: Cache,
@@ -38,9 +40,17 @@ export class OneTokenBaseClient {
       ...(customFetch && { fetch: customFetch }),
     });
 
-    this.client.use({
-      onRequest: this.createAuthMiddleware(),
-    });
+    // Add authentication middleware if supported
+    try {
+      (this.client as any).use({
+        onRequest: this.createAuthMiddleware(),
+      });
+      this.useMiddleware = true;
+      this.logger.debug('OneToken client using middleware-based authentication');
+    } catch (error) {
+      this.useMiddleware = false;
+      this.logger.debug('OneToken client will use header-based authentication');
+    }
   }
 
   private createAuthMiddleware() {
@@ -235,22 +245,53 @@ export class OneTokenBaseClient {
     }
   }
 
+  /**
+   * Get authentication headers for OneToken API requests
+   */
+  private async getAuthHeaders(): Promise<Record<string, string>> {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const path = '/fundv3/openapi/portfolio/list-portfolio';
+    const method = 'GET';
+    const body = '';
+
+    const signature = this.generateSignature(method, path, timestamp, body);
+
+    return {
+      'Api-Timestamp': timestamp.toString(),
+      'Api-Key': this.oneTokenConfig.apiKey,
+      'Api-Signature': signature,
+    };
+  }
+
   // API Methods
   async listPortfolios(options?: { department?: string }) {
     const startTime = Date.now();
 
-    const { data, error } = await this.client.GET('/fundv3/openapi/portfolio/list-portfolio', {
+    const requestOptions: any = {
       params: {
         query: options?.department ? { department: options.department } : {},
       },
-    });
+    };
+
+    // Add auth headers if not using middleware
+    if (!this.useMiddleware) {
+      requestOptions.headers = await this.getAuthHeaders();
+    }
+
+    const { data, error } = await this.client.GET('/fundv3/openapi/portfolio/list-portfolio', requestOptions);
 
     const queryParams = options?.department ? { department: options.department } : {};
     await this.logApiCall('GET', '/fundv3/openapi/portfolio/list-portfolio', options, { data, error }, Date.now() - startTime, queryParams);
 
     if (error) {
+      this.logger.error('Failed to list OneToken portfolios', { error, options });
       throw new Error(`Failed to list portfolios: ${JSON.stringify(error)}`);
     }
+
+    this.logger.debug(`Successfully retrieved portfolios`, {
+      portfolioCount: data?.result?.fund_info_list?.length || 0,
+      department: options?.department
+    });
 
     return data;
   }
@@ -261,7 +302,7 @@ export class OneTokenBaseClient {
   /**
    * Get the underlying API client for direct access
    */
-  getClient() {
+  getClient(): ReturnType<typeof createClient<OneTokenPaths>> {
     return this.client;
   }
 }

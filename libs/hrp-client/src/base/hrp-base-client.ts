@@ -60,23 +60,25 @@ export class HRPBaseClient {
       fetch: this.customFetch,
     });
 
-    // Add auth middleware
-    this.client.use({
-      onRequest: this.createAuthMiddleware(),
-    });
+    // Note: HRP authentication is handled via helper method
+    // due to openapi-fetch version compatibility issues
   }
 
-  private createAuthMiddleware() {
-    return async ({ request }: { request: Request }) => {
-      try {
-        const accessToken = await this.authClient.getAccessToken();
-        request.headers.set('Authorization', `Bearer ${accessToken}`);
-        return request;
-      } catch (error) {
-        this.logger.error('Failed to authenticate HRP request', { error });
-        throw error;
-      }
-    };
+  /**
+   * Get authorization headers for HRP API requests
+   */
+  private async getAuthHeaders(): Promise<{ Authorization: string }> {
+    try {
+      const accessToken = await this.authClient.getAccessToken();
+      return {
+        Authorization: `Bearer ${accessToken}`
+      };
+    } catch (error) {
+      this.logger.error('Failed to get HRP access token', {
+        error: error.message
+      });
+      throw error;
+    }
   }
 
   private createFetchWithProxy() {
@@ -232,20 +234,26 @@ export class HRPBaseClient {
   // API Methods
   async listAccounts(): Promise<HRPAccount[]> {
     const startTime = Date.now();
+    const headers = await this.getAuthHeaders();
 
     const { data, error } = await this.client.GET('/v0/accountactivity/accounts', {
-      params: {},
+      headers: headers,
+      params: {}
     });
 
     await this.logApiCall('GET', '/v0/accountactivity/accounts', null, { data, error }, Date.now() - startTime);
 
     if (error) {
+      this.logger.error('Failed to list HRP accounts', { error });
       throw new Error(`Failed to list accounts: ${JSON.stringify(error)}`);
     }
 
     if (!data?.results) {
+      this.logger.error('Invalid HRP accounts response format', { data });
       throw new Error('Invalid response format: missing results');
     }
+
+    this.logger.debug(`Successfully retrieved ${data.results.length} HRP accounts`);
 
     return data.results;
   }
@@ -253,8 +261,10 @@ export class HRPBaseClient {
   // CIP Calculations
   async fetchCIPCalculations(params: HRPTimestampParams): Promise<HRPCIPCalculation[]> {
     const startTime = Date.now();
+    const headers = await this.getAuthHeaders();
 
     const { data, error } = await this.client.GET('/v0/accountactivity/calculations/v0/cip', {
+      headers: headers,
       params: {
         query: {
           venue: params.venue,
@@ -271,12 +281,16 @@ export class HRPBaseClient {
     await this.logApiCall('GET', '/v0/accountactivity/calculations/v0/cip', params, { data, error }, Date.now() - startTime);
 
     if (error) {
+      this.logger.error('Failed to fetch HRP CIP calculations', { error, params });
       throw new Error(`Failed to fetch CIP calculations: ${JSON.stringify(error)}`);
     }
 
     if (!data?.results) {
+      this.logger.error('Invalid HRP CIP response format', { data, params });
       throw new Error('Invalid response format: missing results');
     }
+
+    this.logger.debug(`Successfully retrieved ${data.results.length} CIP calculations`);
 
     return data.results;
   }
@@ -316,8 +330,10 @@ export class HRPBaseClient {
     startRecordCorrectionVersion?: number;
   }) {
     const startTime = Date.now();
+    const headers = await this.getAuthHeaders();
 
     const { data, error } = await this.client.GET('/v0/accountactivity/trades', {
+      headers: headers,
       params: {
         query: {
           venue: params.venue,
@@ -464,8 +480,10 @@ export class HRPBaseClient {
     startRecordCorrectionVersion?: number;
   }) {
     const startTime = Date.now();
+    const headers = await this.getAuthHeaders();
 
     const { data, error } = await this.client.GET('/v0/accountactivity/calculations/v0/ers', {
+      headers: headers,
       params: {
         query: {
           venue: params.venue,
@@ -503,8 +521,10 @@ export class HRPBaseClient {
     startRecordCorrectionVersion?: number;
   }) {
     const startTime = Date.now();
+    const headers = await this.getAuthHeaders();
 
     const { data, error } = await this.client.GET('/v0/accountactivity/calculations/v0/financing', {
+      headers: headers,
       params: {
         query: {
           venue: params.venue,
@@ -721,16 +741,21 @@ export class HRPBaseClient {
   // Ping endpoint for testing connectivity
   async ping() {
     const startTime = Date.now();
+    const headers = await this.getAuthHeaders();
 
     const { data, error } = await this.client.GET('/v0/accountactivity/ping', {
-      params: {},
+      headers: headers,
+      params: {}
     });
 
     await this.logApiCall('GET', '/v0/accountactivity/ping', null, { data, error }, Date.now() - startTime);
 
     if (error) {
+      this.logger.error('Failed to ping HRP API', { error });
       throw new Error(`Failed to ping HRP API: ${JSON.stringify(error)}`);
     }
+
+    this.logger.debug('HRP API ping successful', { data });
 
     return data;
   }
@@ -738,14 +763,14 @@ export class HRPBaseClient {
   /**
    * Get the underlying API client for direct access
    */
-  getClient() {
+  getClient(): ReturnType<typeof createClient<HRPDataPaths>> {
     return this.client;
   }
 
   /**
    * Get the auth client for token management
    */
-  getAuthClient() {
+  getAuthClient(): HRPAuthClient {
     return this.authClient;
   }
 }
