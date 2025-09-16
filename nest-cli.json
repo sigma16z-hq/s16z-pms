@@ -1,22 +1,22 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "apps/pms-api/src",
+  "sourceRoot": "apps/pms-service/src",
   "compilerOptions": {
     "deleteOutDir": true,
     "webpack": true,
-    "tsConfigPath": "apps/pms-api/tsconfig.app.json"
+    "tsConfigPath": "apps/pms-service/tsconfig.app.json"
   },
   "monorepo": true,
-  "root": "apps/pms-api",
+  "root": "apps/pms-service",
   "projects": {
-    "pms-api": {
+    "pms-service": {
       "type": "application",
-      "root": "apps/pms-api",
+      "root": "apps/pms-service",
       "entryFile": "main",
-      "sourceRoot": "apps/pms-api/src",
+      "sourceRoot": "apps/pms-service/src",
       "compilerOptions": {
-        "tsConfigPath": "apps/pms-api/tsconfig.app.json"
+        "tsConfigPath": "apps/pms-service/tsconfig.app.json"
       }
     },
     "database": {

@@ -1,0 +1,15 @@
+{
+  "name": "pms-service",
+  "version": "0.0.1",
+  "description": "S16Z PMS Service Application (API & Scheduler)",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "nest build pms-service",
+    "start": "nest start pms-service",
+    "start:dev": "nest start pms-service --watch",
+    "start:debug": "nest start pms-service --debug --watch",
+    "start:prod": "node dist/main"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
