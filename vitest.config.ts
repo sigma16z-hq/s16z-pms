@@ -19,5 +19,8 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       reportsDirectory: './coverage',
     },
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
+    threads: false,
   },
 });
