@@ -166,3 +166,5 @@ Use `pnpm dev:reset` to rebuild containers and `pnpm db:generate` after schema u
 - **2-space indentation**, single quotes, trailing commas (Prettier enforced)
 - Feature folders with index.ts barrel exports
 - Avoid to use any as return type it's a bad habbit in typescript.
+- Simple work to make things done
+- Always clean up the unused method, and make good control for function access level control

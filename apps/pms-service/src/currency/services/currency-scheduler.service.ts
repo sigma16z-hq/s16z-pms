@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { SpotQuoteIngestionService } from './spot-quote-ingestion.service';
+import { SpotQuoteIngestionService, BackfillRequirementResult } from './spot-quote-ingestion.service';
 import { CURRENCY_SCHEDULER_CONSTANTS } from '../constants/scheduler.constants';
 
 /**
@@ -156,8 +156,8 @@ export class CurrencySchedulerService {
     this.logger.log('🚀 Starting currency rate synchronization');
 
     try {
-      // Step 1: Check if backfill is needed
-      this.logger.log('🔍 Checking if historical backfill is required...');
+      // Step 1: Check for gaps and fetch missing dates
+      this.logger.log('🔍 Checking for missing currency data...');
       const backfillNeeded = await this.spotQuoteIngestionService.checkBackfillRequired(
         this.currencies,
         this.backfillDays
@@ -165,10 +165,10 @@ export class CurrencySchedulerService {
 
       let backfillSummary = null;
       if (backfillNeeded) {
-        this.logger.log('⏳ Historical backfill required - processing missing data');
-        backfillSummary = await this.performHistoricalBackfill();
+        this.logger.log('⏳ Fetching missing data...');
+        backfillSummary = await this.fetchMissingDates();
       } else {
-        this.logger.log('✅ No historical backfill required - data is up to date');
+        this.logger.log('✅ No missing data found');
       }
 
       // Step 2: Fetch today's rates (yesterday's end-of-day prices)
@@ -330,10 +330,170 @@ export class CurrencySchedulerService {
   }
 
   /**
-   * Perform historical backfill for missing data
+   * Fetch missing dates from gaps
+   */
+  private async fetchMissingDates(): Promise<BackfillSummary> {
+    this.logger.log('📅 Fetching missing dates from gaps');
+
+    try {
+      // Get gaps for all currencies
+      const missingDates = new Set<string>();
+
+      for (const currency of this.currencies) {
+        try {
+          const gaps = await this.spotQuoteIngestionService.detectGaps(currency);
+
+          // Add all dates from gaps
+          for (const gap of gaps) {
+            const startDate = new Date(gap.startDate);
+            const endDate = new Date(gap.endDate);
+
+            for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+              missingDates.add(d.toISOString().split('T')[0]);
+            }
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to get gaps for ${currency}:`, error);
+        }
+      }
+
+      const sortedDates = Array.from(missingDates).sort();
+      this.logger.log(`Found ${sortedDates.length} missing dates to fetch`);
+
+      // Fetch each missing date
+      let totalRatesStored = 0;
+      let processedDays = 0;
+
+      for (const dateStr of sortedDates) {
+        try {
+          const results = await this.spotQuoteIngestionService.fetchAndStoreDailyRates(
+            new Date(dateStr),
+            this.currencies,
+            this.exchange
+          );
+
+          totalRatesStored += results.length;
+          processedDays++;
+
+          if (results.length > 0) {
+            this.logger.debug(`✅ Fetched ${results.length} rates for ${dateStr}`);
+          }
+
+          await this.delay(200);
+        } catch (error) {
+          this.logger.warn(`Failed to fetch ${dateStr}:`, error);
+        }
+      }
+
+      return {
+        dateRange: sortedDates.length > 0 ? `${sortedDates[0]} to ${sortedDates[sortedDates.length - 1]} (gaps)` : 'No gaps',
+        totalDays: sortedDates.length,
+        processedDays,
+        skippedDays: sortedDates.length - processedDays,
+        totalRatesStored,
+      };
+
+    } catch (error) {
+      this.logger.error('Failed to fetch missing dates:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform smart backfill using gap analysis to only fetch missing dates
+   */
+  private async performSmartBackfill(backfillAnalysis: BackfillRequirementResult): Promise<BackfillSummary> {
+    this.logger.log('📅 Starting smart historical backfill');
+
+    try {
+      // Collect all missing dates from all currencies
+      const missingDates = new Set<string>();
+
+      for (const analysis of backfillAnalysis.currencyAnalyses) {
+        if (!analysis.needsBackfill) continue;
+
+        // Add gap dates
+        for (const gap of analysis.gaps) {
+          const gapStart = new Date(gap.startDate);
+          const gapEnd = new Date(gap.endDate);
+
+          for (let d = new Date(gapStart); d <= gapEnd; d.setUTCDate(d.getUTCDate() + 1)) {
+            missingDates.add(d.toISOString().split('T')[0]);
+          }
+        }
+
+      }
+
+      const sortedMissingDates = Array.from(missingDates).sort();
+      const totalDatesToProcess = sortedMissingDates.length;
+
+      this.logger.log(
+        `📊 Smart backfill plan: processing ${totalDatesToProcess} missing dates instead of all ${this.backfillDays} days`
+      );
+
+      // Process only the missing dates
+      let totalRatesStored = 0;
+      let processedDays = 0;
+      let skippedDays = 0;
+
+      for (const dateStr of sortedMissingDates) {
+        try {
+          this.logger.debug(`📈 [${processedDays + 1}/${totalDatesToProcess}] Processing missing date ${dateStr}...`);
+
+          const results = await this.spotQuoteIngestionService.fetchAndStoreDailyRates(
+            new Date(dateStr),
+            this.currencies,
+            this.exchange
+          );
+
+          if (results.length > 0) {
+            totalRatesStored += results.length;
+            this.logger.debug(`✅ Stored ${results.length} rates for ${dateStr}`);
+          } else {
+            skippedDays++;
+            this.logger.debug(`⚠️  No data available for ${dateStr}`);
+          }
+
+          processedDays++;
+
+          // Add small delay between requests to be respectful to the API
+          await this.delay(200);
+
+        } catch (error) {
+          skippedDays++;
+          this.logger.warn(`❌ Failed to process ${dateStr}:`, error);
+          // Continue with next date
+        }
+      }
+
+      const summary = {
+        dateRange: sortedMissingDates.length > 0
+          ? `${sortedMissingDates[0]} to ${sortedMissingDates[sortedMissingDates.length - 1]} (gaps only)`
+          : 'No missing dates',
+        totalDays: totalDatesToProcess,
+        processedDays,
+        skippedDays,
+        totalRatesStored,
+      };
+
+      this.logger.log(
+        `✅ Smart backfill completed: processed ${processedDays}/${totalDatesToProcess} missing dates, ` +
+        `stored ${totalRatesStored} rates, skipped ${skippedDays} dates (efficiency: ${((totalDatesToProcess / this.backfillDays) * 100).toFixed(1)}%)`
+      );
+
+      return summary;
+
+    } catch (error) {
+      this.logger.error('❌ Smart backfill failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform historical backfill for missing data (legacy method)
    */
   private async performHistoricalBackfill(): Promise<BackfillSummary> {
-    this.logger.log('📅 Starting historical backfill');
+    this.logger.log('📅 Starting historical backfill (legacy full scan)');
 
     try {
       // Calculate date range for backfill (last N days)

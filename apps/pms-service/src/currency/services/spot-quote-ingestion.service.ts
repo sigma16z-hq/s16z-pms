@@ -1,8 +1,29 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import { SpotQuoteRepository } from '@app/database';
-import { OneTokenService } from '@s16z/onetoken-client';
+import { SpotQuoteRepository, DateGap } from '@app/database';
+import { OneTokenService, HistoricalPrice } from '@s16z/onetoken-client';
 import { SpotQuote, Prisma } from '@prisma/client';
 import { CURRENCY_SCHEDULER_CONSTANTS, CurrencyExchange } from '../constants/scheduler.constants';
+import { startOfDay, subDays } from 'date-fns';
+
+/**
+ * Currency backfill analysis result
+ */
+export interface CurrencyBackfillAnalysis {
+  currency: string;
+  needsBackfill: boolean;
+  availableDays: number;
+  totalDays: number;
+  gaps: DateGap[];
+  missingRecentDays: number;
+}
+
+/**
+ * Backfill requirement result with detailed analysis
+ */
+export interface BackfillRequirementResult {
+  needsBackfill: boolean;
+  currencyAnalyses: CurrencyBackfillAnalysis[];
+}
 
 /**
  * SpotQuoteIngestionService - Manages fetching and storing historical currency exchange rates
@@ -44,91 +65,50 @@ export class SpotQuoteIngestionService {
 
     const results: SpotQuote[] = [];
 
-    // Create timestamp for 00:00:00 of the requested date
-    const startOfDay = new Date(date);
-    startOfDay.setUTCHours(0, 0, 0, 0);
-    const timestampNano = startOfDay.getTime() * 1000000; // Convert to nanoseconds
-
-    this.logger.debug(`📊 Using timestamp: ${timestampNano} (${startOfDay.toISOString()})`);
-
     try {
-      // Fetch rates from 1Token API
-      this.logger.debug(`🔗 Calling 1Token API: /quote/last-price-before-timestamp`);
+      // Fetch rates from 1Token API using clean service interface
+      this.logger.debug(`🔗 Fetching historical prices from OneToken API`);
 
-      // Get base client and use its internal client for API call
-      const baseClient = this.oneTokenService.getBaseClient();
+      const priceDataArray = await this.oneTokenService.getHistoricalPrices(currencies, exchange, date);
 
-      const requestOptions: {
-        params: {
-          query: {
-            currency: string;
-            exchange: string;
-            timestamp: string;
-          };
-        };
-        headers?: Record<string, string>;
-      } = {
-        params: {
-          query: {
-            currency: currencies.join(','),
-            exchange,
-            timestamp: timestampNano.toString(),
-          }
-        }
-      };
-
-      // Add auth headers if not using middleware
-      if (!(baseClient as any).useMiddleware) {
-        requestOptions.headers = await (baseClient as any).getAuthHeaders();
-      }
-
-      const response = await (baseClient as any).client.GET('/quote/last-price-before-timestamp', requestOptions);
-
-      if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+      if (!priceDataArray || priceDataArray.length === 0) {
         this.logger.warn(`No price data returned for ${date.toISOString().split('T')[0]}`);
         return results;
       }
 
-      // Process each price and store in database
-      for (const priceData of response.data) {
+      // Process each clean price and store in database
+      for (const priceData of priceDataArray) {
         try {
-          // Extract symbol from contract (e.g., "index/btc.usd" -> "btc")
-          const symbol = this.extractSymbolFromContract(priceData.contract);
-          if (!symbol) {
-            this.logger.warn(`Could not extract symbol from contract: ${priceData.contract}`);
-            continue;
-          }
-
           // Check if record already exists
-          const existingRecord = await this.spotQuoteRepository.findByDate(symbol.toLowerCase(), date);
+          const existingRecord = await this.spotQuoteRepository.findByDate(priceData.symbol, date);
 
           let rateRecord: SpotQuote;
           if (existingRecord) {
             // Update existing record
             rateRecord = await this.spotQuoteRepository.update(existingRecord.id, {
-              price: new Prisma.Decimal(priceData.last),
+              price: new Prisma.Decimal(priceData.price),
               fetchedAt: new Date(),
-              originalTm: priceData.tm ? BigInt(priceData.tm) : null,
-              metadata: priceData as any,
+              originalTm: priceData.timestamp ? BigInt(priceData.timestamp) : null,
+              metadata: priceData.metadata,
             });
           } else {
             // Create new record
             rateRecord = await this.spotQuoteRepository.create({
-              symbol: symbol.toLowerCase(),
+              symbol: priceData.symbol,
               baseCurrency: 'usd',
-              price: new Prisma.Decimal(priceData.last),
+              price: new Prisma.Decimal(priceData.price),
               dataSource: '1token',
               exchange,
               contract: priceData.contract,
               priceDate: date,
               fetchedAt: new Date(),
-              originalTm: priceData.tm ? BigInt(priceData.tm) : null,
-              metadata: priceData as any,
+              originalTm: priceData.timestamp ? BigInt(priceData.timestamp) : null,
+              metadata: priceData.metadata,
             });
           }
 
           results.push(rateRecord);
-          this.logger.debug(`Stored rate: ${symbol} = $${priceData.last} (${priceData.contract})`);
+          this.logger.debug(`Stored rate: ${priceData.symbol} = $${priceData.price} (${priceData.contract})`);
         } catch (error) {
           this.logger.error(`Failed to store rate for ${priceData.contract}:`, error);
         }
@@ -151,10 +131,9 @@ export class SpotQuoteIngestionService {
    */
   async getAvailableDates(currency: string, backfillDays: number): Promise<Date[]> {
     try {
-      const endDate = new Date();
-      endDate.setUTCHours(0, 0, 0, 0);
-      const startDate = new Date(endDate);
-      startDate.setDate(startDate.getDate() - backfillDays);
+      // Use date-fns for clean date calculations
+      const endDate = startOfDay(new Date());
+      const startDate = subDays(endDate, backfillDays);
 
       const records = await this.spotQuoteRepository.findByDateRange(
         currency.toLowerCase(),
@@ -170,40 +149,57 @@ export class SpotQuoteIngestionService {
   }
 
   /**
-   * Check if historical backfill is required by looking for missing data and gaps
+   * Analyze backfill requirements with detailed gap information
    * @param currencies - Currencies to check (defaults to defaultCurrencies)
    * @param backfillDays - Number of days to check (defaults to config)
-   * @returns Boolean indicating if backfill is needed
+   * @returns Detailed backfill analysis including gaps for each currency
    */
-  async checkBackfillRequired(
+  async analyzeBackfillRequirements(
     currencies: string[] = this.defaultCurrencies,
     backfillDays: number = CURRENCY_SCHEDULER_CONSTANTS.DEFAULT_CONFIG.BACKFILL_DAYS
-  ): Promise<boolean> {
-    this.logger.debug(`🔍 Checking backfill for ${currencies.length} currencies: ${currencies.join(', ')}`);
+  ): Promise<BackfillRequirementResult> {
+    this.logger.debug(`🔍 Analyzing backfill for ${currencies.length} currencies: ${currencies.join(', ')}`);
 
+    const currencyAnalyses: CurrencyBackfillAnalysis[] = [];
     let needsBackfill = false;
 
     for (const currency of currencies) {
       try {
-        this.logger.debug(`📋 Checking available dates for ${currency}...`);
+        this.logger.debug(`📋 Analyzing ${currency}...`);
 
         // Get available dates for this currency in the backfill period
         const availableDates = await this.getAvailableDates(currency, backfillDays);
+        const missingRecentDays = Math.max(0, backfillDays - availableDates.length);
 
-        this.logger.debug(`💾 ${currency}: Found ${availableDates.length}/${backfillDays} days of recent historical data`);
+        // Get gaps in existing data using SQL-based detection
+        const gaps = await this.spotQuoteRepository.detectGaps(currency, CURRENCY_SCHEDULER_CONSTANTS.DEFAULT_CONFIG.EXCHANGE);
 
-        // Check 1: Missing recent data
-        if (availableDates.length < backfillDays) {
-          this.logger.log(`🔄 ${currency} needs recent backfill: ${availableDates.length}/${backfillDays} days available`);
+        const currencyNeedsBackfill = missingRecentDays > 0 || gaps.length > 0;
+        if (currencyNeedsBackfill) {
           needsBackfill = true;
         }
 
-        // Check 2: Look for gaps in existing data
-        const gaps = await this.detectDataGaps(currency);
+        const analysis: CurrencyBackfillAnalysis = {
+          currency,
+          needsBackfill: currencyNeedsBackfill,
+          availableDays: availableDates.length,
+          totalDays: backfillDays,
+          gaps,
+          missingRecentDays
+        };
+
+        currencyAnalyses.push(analysis);
+
+        // Log analysis results
+        this.logger.debug(`💾 ${currency}: Found ${availableDates.length}/${backfillDays} days of recent historical data`);
+
+        if (missingRecentDays > 0) {
+          this.logger.log(`🔄 ${currency} needs recent backfill: missing ${missingRecentDays} recent days`);
+        }
+
         if (gaps.length > 0) {
           const totalMissingDays = gaps.reduce((sum, gap) => sum + gap.missingDays, 0);
           this.logger.log(`🕳️  ${currency} has ${gaps.length} gaps totaling ${totalMissingDays} missing days`);
-          needsBackfill = true;
 
           // Log the gaps for visibility
           gaps.forEach((gap, index) => {
@@ -213,8 +209,19 @@ export class SpotQuoteIngestionService {
           this.logger.debug(`✅ ${currency} has no gaps in existing data`);
         }
       } catch (error) {
-        this.logger.warn(`⚠️ Error checking backfill for ${currency}:`, error);
-        this.logger.debug(`🔄 Assuming backfill needed due to error`);
+        this.logger.warn(`⚠️ Error analyzing backfill for ${currency}:`, error);
+
+        // Create error analysis - assume backfill needed
+        const errorAnalysis: CurrencyBackfillAnalysis = {
+          currency,
+          needsBackfill: true,
+          availableDays: 0,
+          totalDays: backfillDays,
+          gaps: [],
+          missingRecentDays: backfillDays
+        };
+
+        currencyAnalyses.push(errorAnalysis);
         needsBackfill = true;
       }
     }
@@ -225,75 +232,34 @@ export class SpotQuoteIngestionService {
       this.logger.log('✅ All currencies have complete historical data');
     }
 
-    return needsBackfill;
+    return {
+      needsBackfill,
+      currencyAnalyses
+    };
   }
 
   /**
-   * Detect gaps in existing data for a specific currency
+   * Check if historical backfill is required (simple boolean version)
+   * @param currencies - Currencies to check (defaults to defaultCurrencies)
+   * @param backfillDays - Number of days to check (defaults to config)
+   * @returns Boolean indicating if backfill is needed
    */
-  private async detectDataGaps(currency: string): Promise<Array<{startDate: string, endDate: string, missingDays: number}>> {
-    try {
-      // Get all existing dates for this currency (simplified approach)
-      const existingRecords = await this.spotQuoteRepository.findBySymbol(currency.toLowerCase());
-
-      // Filter by exchange and sort by date
-      const existingDates = existingRecords
-        .filter(record => record.exchange === CURRENCY_SCHEDULER_CONSTANTS.DEFAULT_CONFIG.EXCHANGE)
-        .map(record => ({ priceDate: record.priceDate }))
-        .sort((a, b) => a.priceDate.getTime() - b.priceDate.getTime());
-
-      if (existingDates.length < 2) {
-        return []; // Need at least 2 dates to detect gaps
-      }
-
-      const gaps: Array<{startDate: string, endDate: string, missingDays: number}> = [];
-
-      for (let i = 1; i < existingDates.length; i++) {
-        const prevDate = new Date(existingDates[i - 1].priceDate);
-        const currDate = new Date(existingDates[i].priceDate);
-        const daysDiff = Math.floor((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (daysDiff > 1) {
-          const gapStart = new Date(prevDate);
-          gapStart.setDate(gapStart.getDate() + 1);
-          const gapEnd = new Date(currDate);
-          gapEnd.setDate(gapEnd.getDate() - 1);
-
-          gaps.push({
-            startDate: gapStart.toISOString().split('T')[0],
-            endDate: gapEnd.toISOString().split('T')[0],
-            missingDays: daysDiff - 1,
-          });
-        }
-      }
-
-      return gaps;
-    } catch (error) {
-      this.logger.error(`Failed to detect gaps for ${currency}:`, error);
-      return [];
-    }
+  async checkBackfillRequired(
+    currencies: string[] = this.defaultCurrencies,
+    backfillDays: number = CURRENCY_SCHEDULER_CONSTANTS.DEFAULT_CONFIG.BACKFILL_DAYS
+  ): Promise<boolean> {
+    const analysis = await this.analyzeBackfillRequirements(currencies, backfillDays);
+    return analysis.needsBackfill;
   }
 
   /**
-   * Extract currency symbol from 1Token contract string
-   * @param contract - Contract string (e.g., "index/btc.usd")
-   * @returns Currency symbol or null if extraction fails
+   * Detect gaps for a currency using SQL
+   * @param currency - Currency to check
+   * @returns Array of gaps
    */
-  private extractSymbolFromContract(contract: string): string | null {
-    try {
-      // Handle contract formats like "index/btc.usd", "cmc/eth.usd"
-      const parts = contract.split('/');
-      if (parts.length >= 2) {
-        const symbolPart = parts[1].split('.')[0]; // Get "btc" from "btc.usd"
-        return symbolPart.toLowerCase();
-      }
-
-      // Fallback: try to extract directly
-      const symbolMatch = contract.match(/([a-zA-Z]+)/);
-      return symbolMatch ? symbolMatch[1].toLowerCase() : null;
-    } catch (error) {
-      this.logger.warn(`Failed to extract symbol from contract: ${contract}`, error);
-      return null;
-    }
+  async detectGaps(currency: string): Promise<DateGap[]> {
+    return this.spotQuoteRepository.detectGaps(currency, CURRENCY_SCHEDULER_CONSTANTS.DEFAULT_CONFIG.EXCHANGE);
   }
+
+
 }
