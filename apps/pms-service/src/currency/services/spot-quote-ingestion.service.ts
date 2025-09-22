@@ -5,25 +5,6 @@ import { SpotQuote, Prisma } from '@prisma/client';
 import { CURRENCY_SCHEDULER_CONSTANTS, CurrencyExchange } from '../constants/scheduler.constants';
 import { startOfDay, subDays } from 'date-fns';
 
-/**
- * Currency backfill analysis result
- */
-export interface CurrencyBackfillAnalysis {
-  currency: string;
-  needsBackfill: boolean;
-  availableDays: number;
-  totalDays: number;
-  gaps: DateGap[];
-  missingRecentDays: number;
-}
-
-/**
- * Backfill requirement result with detailed analysis
- */
-export interface BackfillRequirementResult {
-  needsBackfill: boolean;
-  currencyAnalyses: CurrencyBackfillAnalysis[];
-}
 
 /**
  * SpotQuoteIngestionService - Manages fetching and storing historical currency exchange rates
@@ -149,97 +130,7 @@ export class SpotQuoteIngestionService {
   }
 
   /**
-   * Analyze backfill requirements with detailed gap information
-   * @param currencies - Currencies to check (defaults to defaultCurrencies)
-   * @param backfillDays - Number of days to check (defaults to config)
-   * @returns Detailed backfill analysis including gaps for each currency
-   */
-  async analyzeBackfillRequirements(
-    currencies: string[] = this.defaultCurrencies,
-    backfillDays: number = CURRENCY_SCHEDULER_CONSTANTS.DEFAULT_CONFIG.BACKFILL_DAYS
-  ): Promise<BackfillRequirementResult> {
-    this.logger.debug(`🔍 Analyzing backfill for ${currencies.length} currencies: ${currencies.join(', ')}`);
-
-    const currencyAnalyses: CurrencyBackfillAnalysis[] = [];
-    let needsBackfill = false;
-
-    for (const currency of currencies) {
-      try {
-        this.logger.debug(`📋 Analyzing ${currency}...`);
-
-        // Get available dates for this currency in the backfill period
-        const availableDates = await this.getAvailableDates(currency, backfillDays);
-        const missingRecentDays = Math.max(0, backfillDays - availableDates.length);
-
-        // Get gaps in existing data using SQL-based detection
-        const gaps = await this.spotQuoteRepository.detectGaps(currency, CURRENCY_SCHEDULER_CONSTANTS.DEFAULT_CONFIG.EXCHANGE);
-
-        const currencyNeedsBackfill = missingRecentDays > 0 || gaps.length > 0;
-        if (currencyNeedsBackfill) {
-          needsBackfill = true;
-        }
-
-        const analysis: CurrencyBackfillAnalysis = {
-          currency,
-          needsBackfill: currencyNeedsBackfill,
-          availableDays: availableDates.length,
-          totalDays: backfillDays,
-          gaps,
-          missingRecentDays
-        };
-
-        currencyAnalyses.push(analysis);
-
-        // Log analysis results
-        this.logger.debug(`💾 ${currency}: Found ${availableDates.length}/${backfillDays} days of recent historical data`);
-
-        if (missingRecentDays > 0) {
-          this.logger.log(`🔄 ${currency} needs recent backfill: missing ${missingRecentDays} recent days`);
-        }
-
-        if (gaps.length > 0) {
-          const totalMissingDays = gaps.reduce((sum, gap) => sum + gap.missingDays, 0);
-          this.logger.log(`🕳️  ${currency} has ${gaps.length} gaps totaling ${totalMissingDays} missing days`);
-
-          // Log the gaps for visibility
-          gaps.forEach((gap, index) => {
-            this.logger.debug(`   Gap ${index + 1}: ${gap.startDate} to ${gap.endDate} (${gap.missingDays} days missing)`);
-          });
-        } else {
-          this.logger.debug(`✅ ${currency} has no gaps in existing data`);
-        }
-      } catch (error) {
-        this.logger.warn(`⚠️ Error analyzing backfill for ${currency}:`, error);
-
-        // Create error analysis - assume backfill needed
-        const errorAnalysis: CurrencyBackfillAnalysis = {
-          currency,
-          needsBackfill: true,
-          availableDays: 0,
-          totalDays: backfillDays,
-          gaps: [],
-          missingRecentDays: backfillDays
-        };
-
-        currencyAnalyses.push(errorAnalysis);
-        needsBackfill = true;
-      }
-    }
-
-    if (needsBackfill) {
-      this.logger.log('🔄 Backfill required - found missing data or gaps');
-    } else {
-      this.logger.log('✅ All currencies have complete historical data');
-    }
-
-    return {
-      needsBackfill,
-      currencyAnalyses
-    };
-  }
-
-  /**
-   * Check if historical backfill is required (simple boolean version)
+   * Check if historical backfill is required
    * @param currencies - Currencies to check (defaults to defaultCurrencies)
    * @param backfillDays - Number of days to check (defaults to config)
    * @returns Boolean indicating if backfill is needed
@@ -248,8 +139,25 @@ export class SpotQuoteIngestionService {
     currencies: string[] = this.defaultCurrencies,
     backfillDays: number = CURRENCY_SCHEDULER_CONSTANTS.DEFAULT_CONFIG.BACKFILL_DAYS
   ): Promise<boolean> {
-    const analysis = await this.analyzeBackfillRequirements(currencies, backfillDays);
-    return analysis.needsBackfill;
+    for (const currency of currencies) {
+      try {
+        // Check recent data
+        const availableDates = await this.getAvailableDates(currency, backfillDays);
+        if (availableDates.length < backfillDays) {
+          return true;
+        }
+
+        // Check for gaps
+        const gaps = await this.spotQuoteRepository.detectGaps(currency, CURRENCY_SCHEDULER_CONSTANTS.DEFAULT_CONFIG.EXCHANGE);
+        if (gaps.length > 0) {
+          return true;
+        }
+      } catch (error) {
+        this.logger.warn(`Error checking backfill for ${currency}:`, error);
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
