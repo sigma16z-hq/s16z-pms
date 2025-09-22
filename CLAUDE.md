@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project background
+
+This is a refactoring project based on the POC project from /root/workspace/annamite-pms which still not online yet.
+We want to refactor the backend especially, to replace the boilerplate code that it implement by themselves and use the mature libs in js ecosystem.
+Also the code implmentation in the POC project isn't so good, so the refacoting is also a chance for us to make code clearer and easy to maintain.
+
+You should take reference from it, and help us to finish the refactoring and migrating so that we can have a better maintained new project.
+
 ## Plan & Review Workflow
 
 - **Plan first**: Stay in plan mode, map an MVP with rationale and tasks (use the Task tool for research), store it as `/tasks/TASK_NAME.md`, and wait for approval before coding
@@ -70,6 +78,7 @@ pnpm vitest run --changed                            # Run tests for changed fil
 
 ### Business Domains (Domain-Driven Design)
 - **`src/accounts/`** - HRP account processing, classification, and sync scheduling
+- **`src/currency/`** - Currency conversion and daily rate synchronization from 1Token
 - **`src/transfers/`** - Transfer processing (planned)
 - **`src/fees/`** - Fee calculations (planned)
 
@@ -122,6 +131,7 @@ Copy `.env.local.example` to `.env.local` and configure:
 - HRP API credentials (client ID/secret)
 - OneToken API credentials (key/secret)
 - Scheduler settings (enabled/cron expressions)
+- Currency sync settings (enabled/schedule/exchange/backfill days)
 
 Use `pnpm dev:reset` to rebuild containers and `pnpm db:generate` after schema updates.
 
@@ -132,6 +142,13 @@ Use `pnpm dev:reset` to rebuild containers and `pnpm db:generate` after schema u
 - Scheduled sync jobs configurable via environment variables
 - Manual triggers available via REST endpoints (`/hrp-account-jobs/sync`)
 - Transaction-based processing for data consistency
+
+### Currency Domain
+- Automated daily currency rate synchronization from 1Token API
+- Support for 7 cryptocurrencies: BTC, ETH, USDT, USDC, SOL, AVAX, MATIC
+- Intelligent historical backfill with gap detection
+- Manual triggers available via REST endpoints (`/currency-jobs/sync`)
+- USD-centric conversion supporting all currency pairs
 
 ### API Clients
 - All external API clients extend base classes from `libs/api-client-base/`
@@ -148,3 +165,4 @@ Use `pnpm dev:reset` to rebuild containers and `pnpm db:generate` after schema u
 - **kebab-case** for file names
 - **2-space indentation**, single quotes, trailing commas (Prettier enforced)
 - Feature folders with index.ts barrel exports
+- Avoid to use any as return type it's a bad habbit in typescript.

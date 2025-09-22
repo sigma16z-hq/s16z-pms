@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { DatabaseModule } from '@app/database';
 import { AccountsModule } from './accounts';
+import { CurrencyModule } from './currency';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -19,6 +20,7 @@ import { AppService } from './app.service';
     }),
     DatabaseModule,
     AccountsModule, // HRP Accounts Domain
+    CurrencyModule, // Currency Conversion & Rate Sync
   ],
   controllers: [AppController],
   providers: [AppService],
