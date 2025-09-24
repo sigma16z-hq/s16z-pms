@@ -1,0 +1,27 @@
+/**
+ * Scheduler constants for transfers domain
+ */
+export const TRANSFERS_SCHEDULER_CONSTANTS = {
+  CRON_JOBS: {
+    TRANSFER_SYNC: 'hrp-transfer-sync'
+  },
+  DEFAULT_SCHEDULE: {
+    CRON_EXPRESSION: '0 2 * * *', // Daily at 2 AM UTC
+    TIMEZONE: 'UTC'
+  },
+  CONFIG_KEYS: {
+    SCHEDULE: 'TRANSFER_SYNC_SCHEDULE',
+    ENABLED: 'TRANSFER_SYNC_ENABLED',
+    LOOKBACK_DAYS_DEPOSITS: 'TRANSFER_LOOKBACK_DAYS_DEPOSITS',
+    LOOKBACK_DAYS_WITHDRAWALS: 'TRANSFER_LOOKBACK_DAYS_WITHDRAWALS',
+    BATCH_SIZE: 'TRANSFER_BATCH_SIZE'
+  },
+  DEFAULT_CONFIG: {
+    ENABLED: true,
+    LOOKBACK_DAYS_DEPOSITS: 300,
+    LOOKBACK_DAYS_WITHDRAWALS: 600,
+    BATCH_SIZE: 100,
+  }
+} as const;
+
+export type TransferType = 'deposit' | 'withdrawal';
